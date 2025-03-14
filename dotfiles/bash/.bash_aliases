@@ -20,6 +20,14 @@ function launch() {
             sudo systemctl start docker
 
             case $launch_option in
+                abb)
+                    local container_name=mysql-abb
+                    if __missing_docker_container $container_name; then
+                        __docker_run_abb
+                    else
+                        docker start $container_name
+                    fi
+                    ;;
                 swagelok)
                     local container_name=mysql-swagelok
                     if __missing_docker_container $container_name; then
@@ -75,7 +83,7 @@ function __autocompletion() {
             words="monitor automation"
             ;;
         docker)
-            words="swagelok trek sst"
+            words="abb swagelok trek sst"
             ;;
         tunnel)
             words="trek"
@@ -131,6 +139,11 @@ function __missing_docker_container() {
     return 1
 
 }
+
+function __docker_run_abb() {
+    docker run --name mysql-abb -d -p 3306:3306 -v /home/clutcher/db/mysql8:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=ge -e MYSQL_USER=hybris -e MYSQL_PASSWORD=hybris mysql/mysql-server:8.0
+}
+
 
 function __docker_run_swagelok() {
     docker run --name mysql-swagelok -d -p 3306:3306 -v /home/clutcher/db/mysql:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=swagelock -e MYSQL_USER=hybris -e MYSQL_PASSWORD=Monkey1! mysql/mysql-server:5.7
