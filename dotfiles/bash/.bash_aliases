@@ -141,12 +141,12 @@ function __missing_docker_container() {
 }
 
 function __docker_run_abb() {
-    docker run --name mysql-abb -d -p 3306:3306 -v /home/clutcher/db/mysql8:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=ge -e MYSQL_USER=hybris -e MYSQL_PASSWORD=hybris mysql/mysql-server:8.0
+    docker run --ulimit nofile=262144:262144 --name mysql-abb -d -p 3306:3306 -v /home/clutcher/db/mysql8:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=ge -e MYSQL_USER=hybris -e MYSQL_PASSWORD=hybris mysql/mysql-server:8.0
 }
 
 
 function __docker_run_swagelok() {
-    docker run --name mysql-swagelok -d -p 3306:3306 -v /home/clutcher/db/mysql:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=swagelock -e MYSQL_USER=hybris -e MYSQL_PASSWORD=Monkey1! mysql/mysql-server:5.7
+    docker run --ulimit nofile=262144:262144 --name mysql-swagelok -d -p 3306:3306 -v /home/clutcher/db/mysql:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=swagelock -e MYSQL_USER=hybris -e MYSQL_PASSWORD=Monkey1! mysql/mysql-server:5.7
 }
 
 function __docker_run_sst() {
