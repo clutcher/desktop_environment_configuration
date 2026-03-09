@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Used for development of SAP Commerce (Hybris) projects
 
 cd() {

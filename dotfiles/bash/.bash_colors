@@ -1,1 +1,3 @@
+#!/bin/bash
+
 PS1="\[\e[1m\e[38;2;239;120;114m\]${debian_chroot:+($debian_chroot)}\u@\h\[\e[1m\e[m\]:\[\e[1m\e[38;2;148;191;243m\]\w\[\e[1m\e[m\]\$ "
