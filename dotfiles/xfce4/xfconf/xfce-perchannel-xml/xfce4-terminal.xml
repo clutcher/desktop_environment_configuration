@@ -29,4 +29,7 @@
     <property name="run-custom-command" type="bool" value="true"/>
     <property name="custom-command" type="string" value="bash"/>
     <property name="misc-show-unsafe-paste-dialog" type="bool" value="false"/>
+    <property name="scrolling-lines" type="uint" value="10000"/>
+    <property name="overlay-scrolling" type="bool" value="true"/>
+    <property name="misc-confirm-close" type="bool" value="false"/>
 </channel>
