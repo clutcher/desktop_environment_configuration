@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for key in "$HOME/.ssh"/bitbucket_*; do
+    [[ "$key" == *.pub ]] && continue
+    [[ -f "$key" ]] && ssh-add "$key" 2>/dev/null
+done
