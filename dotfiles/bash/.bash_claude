@@ -1,0 +1,38 @@
+#!/bin/bash
+
+claude() {
+    local profile_value="personal"
+    local claude_args=()
+
+    local color_border='\033[1;38;2;148;191;243m'
+    local color_label='\033[1;37m'
+    local color_value='\033[1;38;2;239;120;114m'
+    local color_reset='\033[0m'
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -p)
+                if [[ -n "$2" && "$2" != -* ]]; then
+                    profile_value="$2"
+                    shift 2
+                else
+                    printf 'Error: -p requires a value\n' >&2
+                    return 1
+                fi
+                ;;
+            *)
+                claude_args+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    printf '\n'
+    printf "${color_border}╔══════════════════════════════════════╗${color_reset}\n"
+    printf "${color_border}║${color_label}          CLAUDE PROFILE              ${color_border}║${color_reset}\n"
+    printf "${color_border}║${color_value} %-36s ${color_border}║${color_reset}\n" "$profile_value"
+    printf "${color_border}╚══════════════════════════════════════╝${color_reset}\n"
+    printf '\n'
+
+    CLAUDE_CONFIG_DIR="$HOME/.claude-$profile_value" command claude "${claude_args[@]}"
+}
