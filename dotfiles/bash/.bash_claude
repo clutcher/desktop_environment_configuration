@@ -9,16 +9,38 @@ claude() {
     local color_value='\033[1;38;2;239;120;114m'
     local color_reset='\033[0m'
 
+    show_help() {
+        cat <<'EOF'
+Usage: claude [-p PROFILE] [--] [claude arguments...]
+
+Options:
+  -p, --profile PROFILE  Select profile name. Sets CLAUDE_CONFIG_DIR to
+                         "$HOME/.claude-PROFILE" for the launched claude command.
+  -h, --help             Show this help message and original claude help.
+EOF
+    }
+
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -p)
+            -p|--profile)
                 if [[ -n "$2" && "$2" != -* ]]; then
                     profile_value="$2"
                     shift 2
                 else
-                    printf 'Error: -p requires a value\n' >&2
+                    printf 'Error: %s requires a value\n' "$1" >&2
                     return 1
                 fi
+                ;;
+            -h|--help)
+                show_help
+                printf '\nOriginal claude help:\n\n'
+                CLAUDE_CONFIG_DIR="$HOME/.claude-$profile_value" command claude --help
+                return $?
+                ;;
+            --)
+                shift
+                claude_args+=("$@")
+                break
                 ;;
             *)
                 claude_args+=("$1")
