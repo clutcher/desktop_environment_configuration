@@ -49,7 +49,7 @@ function __autocompletion() {
             words="fix docker"
             ;;
         fix)
-            words="monitor automation"
+            words="monitors automation"
             ;;
         docker)
             words="abb iba"
@@ -76,9 +76,36 @@ function __fix_automation_containers() {
 }
 
 function __fix_monitors() {
-    xrandr --output eDP1 --mode 1920x1080 \
-        --output DP2-1-5 --right-of eDP1 --mode 1920x1200 --primary \
-        --output DP2-2 --right-of DP2-1-5 --mode 1920x1200
+    local commands=()
+    local offset=0
+
+    for output in $(__connected_outputs); do
+        commands+=("output.$output.enable")
+        commands+=("output.$output.mode.$(__preferred_mode "$output")")
+        commands+=("output.$output.position.$offset,0")
+
+        offset=$((offset + $(__preferred_width "$output")))
+    done
+
+    # Middle monitor is the primary one
+    local outputs=($(__connected_outputs))
+    commands+=("output.${outputs[$((${#outputs[@]} / 2))]}.primary")
+
+    kscreen-doctor "${commands[@]}"
+}
+
+function __connected_outputs() {
+    # Ordered as they stand on the desk, so the arrangement is kept and the middle one is really middle
+    kscreen-doctor -j | jq -r '[.outputs[] | select(.connected)] | sort_by(.pos.x) | .[].name'
+}
+
+function __preferred_mode() {
+    kscreen-doctor -j | jq -r --arg name "$1" '.outputs[] | select(.name == $name) | .preferredModes[0]'
+}
+
+function __preferred_width() {
+    kscreen-doctor -j | jq -r --arg name "$1" '.outputs[] | select(.name == $name) as $output
+        | $output.modes[] | select(.id == $output.preferredModes[0]) | .size.width'
 }
 
 ## Docker

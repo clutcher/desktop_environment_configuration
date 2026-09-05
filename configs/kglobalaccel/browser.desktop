@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Browser
+Exec=google-chrome
+Icon=google-chrome
+NoDisplay=true
+StartupNotify=false
+X-KDE-Shortcuts=Meta+B

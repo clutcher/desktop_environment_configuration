@@ -5,12 +5,12 @@ debian installation (no environments checkboxes during installation).
 
 ### Would be installed:
 
-+ LightDM as login manager
-+ AwesomeWM as tiling window manager
-+ Theming AwesomeWM (awesome-copycats themes with custom rc.lua)
++ SDDM as login manager
++ KDE Plasma 6 on wayland, with krohnkite for dynamic tiling
++ Tags, hotkeys and panel arranged the way awesome was configured before
 + Tools to work with Hardware (network, bluetooth, sound)
-+ Minimal set of xfce4/gtk based applications
-+ Configuration of touchpad and backlight
++ Minimal set of KDE based applications
++ Configuration of backlight
 + Installation various dev tools (Intellij IDEA, Java/sdkman, NodeJS/nvm, Docker etc.)
 + Installation of Obsidian and insync
 

@@ -1,11 +1,17 @@
 #!/bin/bash
 
-curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
-sudo install -o root -g root -m 644 microsoft.gpg /etc/apt/trusted.gpg.d/
-sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+# Microsoft publishes no sid suite, so the repository follows the current debian stable
+curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /etc/apt/keyrings/microsoft-prod.gpg
+sudo tee /etc/apt/sources.list.d/microsoft-prod.sources > /dev/null <<EOT
+Types: deb
+URIs: https://packages.microsoft.com/debian/13/prod/
+Suites: trixie
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/microsoft-prod.gpg
+EOT
 
 sudo apt update
-sudo apt install code
+sudo apt install -y code
 
-rm microsoft.gpg
 # @ToDo: add plugins installation

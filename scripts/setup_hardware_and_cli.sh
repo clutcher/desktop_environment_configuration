@@ -1,21 +1,21 @@
 #!/bin/bash
 
 # Install cli packages for comfort work
-sudo apt install mc jq zip curl wget \
+sudo apt install -y mc jq zip curl wget \
     git git-lfs imagemagick openvpn \
-    net-tools \
+    net-tools openssh-client xdg-user-dirs \
     fonts-noto-core fonts-noto-color-emoji
 
 sudo fc-cache -fv
 
 # Install libraries
-sudo apt install libglib2.0-bin
+sudo apt install -y libglib2.0-bin
 
 # Install drivers
-sudo apt install firmware-linux
+sudo apt install -y firmware-linux
 
 # Hardware support
-sudo apt install network-manager bluez pipewire-audio alsa-utils
+sudo apt install -y network-manager bluez pipewire-audio alsa-utils
 
 # Setup udev rules
 sudo cp -rf configs/udev/* /etc/udev/rules.d/

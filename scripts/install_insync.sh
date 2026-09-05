@@ -1,7 +1,14 @@
 #!/bin/bash
 
-wget -q "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xaeeb94e9c5a3b54ecfa4a66aa684470caccaf35c" -O- | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/insync.gpg
-sudo add-apt-repository "deb [arch=amd64] http://apt.insync.io/debian bookworm non-free contrib"
+wget -q "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xaeeb94e9c5a3b54ecfa4a66aa684470caccaf35c" -O- | sudo gpg --dearmor -o /etc/apt/keyrings/insynchq.gpg
+sudo tee /etc/apt/sources.list.d/insync.sources > /dev/null <<EOT
+Types: deb
+URIs: http://apt.insync.io/debian/
+Suites: sid
+Components: non-free contrib
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/insynchq.gpg
+EOT
 
 sudo apt update
-sudo apt install insync
+sudo apt install -y insync

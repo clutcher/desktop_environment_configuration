@@ -1,3 +1,5 @@
+#!/bin/bash
+
 FIRMWARE_REPO=https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/
 latest_version=$(git ls-remote --tags $FIRMWARE_REPO | sort -t '/' -k 3 -V | awk -F/ '{ print $3 }' | awk '!/\^\{\}/' | tail -n 1)
 

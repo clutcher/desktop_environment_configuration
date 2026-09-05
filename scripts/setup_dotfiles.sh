@@ -1,7 +1,9 @@
+#!/bin/bash
+
 cp -rf dotfiles/* ~/.config/
 
-START_MARKER="# BEGIN awesome-wm-config"
-END_MARKER="# END awesome-wm-config"
+START_MARKER="# BEGIN desktop_environment_configuration"
+END_MARKER="# END desktop_environment_configuration"
 BASH_CONFIG=$(cat <<EOT
 
 $START_MARKER

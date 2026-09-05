@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Insync
+Exec=insync start
+StartupNotify=false
+Terminal=false
+X-KDE-autostart-after=panel

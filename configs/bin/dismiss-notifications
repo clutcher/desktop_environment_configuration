@@ -1,0 +1,12 @@
+#!/bin/bash
+
+NOTIFICATION_SERVICE=(org.freedesktop.Notifications /org/freedesktop/Notifications org.freedesktop.Notifications)
+
+# The server numbers notifications in sequence, so one of our own reveals how far the counter got
+newest_id=$(busctl --user call "${NOTIFICATION_SERVICE[@]}" Notify "susssasa{sv}i" \
+    dismiss-notifications 0 "" "" "" 0 1 desktop-entry s dismiss-notifications 1 | awk '{print $2}')
+
+# Nothing lists the open popups, so every id up to the newest is closed, starting with our own
+for id in $(seq "$newest_id" -1 1); do
+    busctl --user call "${NOTIFICATION_SERVICE[@]}" CloseNotification u "$id" >/dev/null
+done

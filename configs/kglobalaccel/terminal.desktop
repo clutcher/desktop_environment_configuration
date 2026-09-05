@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Exec=konsole --hide-menubar --hide-toolbars
+Icon=utilities-terminal
+NoDisplay=true
+StartupNotify=false
+X-KDE-Shortcuts=Meta+Return
