@@ -107,6 +107,14 @@ conffile and this sddm build has no `theme.conf.user` override, so an `sddm-them
 silently resets it — re-run the stage. Debian's `debian-theme` is an alternatives symlink onto
 `breeze`, so there is no `[Theme] Current` to set.
 
+Dolphin's per folder view (`~/Downloads/.directory`) carries a far future `Timestamp` on purpose.
+On its first run Dolphin sets `[General] ViewPropsTimestamp` to the current time, and
+`ViewProperties` treats any folder view older than that as stale and replaces it with defaults —
+for Downloads, grouped and folders mixed in. Presetting `[General] Version` to skip that first run
+is not an option: the same check is what adds the hamburger menu to the toolbar, and with the
+menubar off Dolphin would be left with no menu. Dolphin moves the file into the folder's
+`user.kde.fm.viewproperties#1` xattr the first time it saves a view there.
+
 The four Plasma stages, in order:
 
 | Script | Responsibility |

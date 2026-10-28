@@ -47,6 +47,29 @@ kwriteconfig6 --file plasmanotifyrc --group Applications --group dismiss-notific
 sudo apt install -y dolphin ark kio-extras kdegraphics-thumbnailers ffmpegthumbs
 xdg-mime default org.kde.dolphin.desktop inode/directory
 
+# Every folder keeps its own view, so Downloads can sort apart from the name order everywhere else
+kwriteconfig6 --file dolphinrc --group General --key GlobalViewProps false
+# Every window opens at home instead of restoring the folders and tabs of the last one
+kwriteconfig6 --file dolphinrc --group General --key RememberOpenedTabs false
+# Dolphin moves a .directory it finds into the folder's extended attributes on first visit
+kwriteconfig6 --file ~/Downloads/.directory --group Dolphin --key Version 4
+kwriteconfig6 --file ~/Downloads/.directory --group Dolphin --key SortRole modificationtime
+# Sort order 1 is descending, so the newest download is on top
+kwriteconfig6 --file ~/Downloads/.directory --group Dolphin --key SortOrder 1
+# Left unset, Dolphin turns grouping on for Downloads and mixes files with folders
+kwriteconfig6 --file ~/Downloads/.directory --group Dolphin --key GroupedSorting false
+kwriteconfig6 --file ~/Downloads/.directory --group Dolphin --key SortFoldersFirst true
+# First dolphin run stamps the current time, and any folder view older than it is replaced by defaults
+kwriteconfig6 --file ~/Downloads/.directory --group Dolphin --key Timestamp "2100,1,1,0,0,0"
+
+# Icons are one step above the defaults, with and without previews alike
+kwriteconfig6 --file dolphinrc --group IconsMode --key IconSize 96
+kwriteconfig6 --file dolphinrc --group IconsMode --key PreviewSize 96
+for dolphin_view_mode in DetailsMode CompactMode; do
+    kwriteconfig6 --file dolphinrc --group "$dolphin_view_mode" --key IconSize 64
+    kwriteconfig6 --file dolphinrc --group "$dolphin_view_mode" --key PreviewSize 64
+done
+
 # GUI for hardware connection
 sudo apt install -y plasma-nm bluedevil plasma-pa
 
