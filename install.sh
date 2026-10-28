@@ -31,6 +31,7 @@ source scripts/install_nodejs.sh
 
 source scripts/install_intellij.sh
 source scripts/install_vscode.sh
+source scripts/install_zed.sh
 
 source scripts/install_docker.sh
 
