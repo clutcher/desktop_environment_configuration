@@ -316,6 +316,11 @@ concatenates the output of every `print`, so they arrive as one space-separated 
   publishes**: sid where it exists (insync), otherwise the current Debian stable — `trixie` for
   docker, `debian/13` for microsoft. Check `<repo>/dists/` before assuming a suite is there;
   these two need bumping by hand when Debian releases.
+- Check the vendor package's maintainer scripts before writing its repo, because some vendors
+  manage their own source. Chrome rewrites `google-chrome.sources` with its own key path on every
+  update, so `install_chrome.sh` installs the direct `.deb` and lets the package own the repo.
+  Claude Desktop adds its own `.list` only when no other source has the repo, so
+  `install_claude_desktop.sh` writes the `.sources` and the package stands back.
 - Comment style differs from the usual no-comments rule: scripts use short comments to say what
   an opaque `apt`/`kwriteconfig6`/`sed` line is for, and to preserve deliberately disabled
   alternatives. **One line each** — say why, not what. When a block needs two explanations, put

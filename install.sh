@@ -22,6 +22,7 @@ source scripts/configure_plasma_shortcuts.sh
 source scripts/configure_plasma_session.sh
 
 source scripts/install_chrome.sh
+source scripts/install_claude_desktop.sh
 
 source scripts/setup_dotfiles.sh
 
