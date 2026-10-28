@@ -184,6 +184,20 @@ right — with the middle monitor primary, left is 1 and right is 2. `panel-layo
 panel per screen but puts the sensors, battery, keyboard indicator and system tray on screen 0
 only. Both break quietly on a different monitor count or a different primary.
 
+### Krohnkite comes from Codeberg and needs 0.9.10 or newer
+
+Krohnkite lives at <https://codeberg.org/anametologin/Krohnkite>; the GitHub releases stop at
+0.9.9.2. Do not go back below 0.9.10: older releases read only the global `currentDesktop`, which
+under `PerOutputVirtualDesktops` is the *active* output's desktop, so every other monitor found no
+windows and kept a stale layout. 0.9.10 resolves each output through
+`workspace.currentDesktopForScreen` (KWin 6.7 and newer).
+
+Floating rules go in `floatConfig`, one rule per line as `classes[:title]:params`; a bare class
+list floats. `floatingClass` and `floatingTitle` are still declared in `main.xml` but the script
+no longer reads them, so writing them fails with no error. On a version bump, diff the
+`<entry name=...>` keys of `contents/config/main.xml` and the `Krohnkite*` action names in
+`contents/ui/shortcuts.qml` against what the scripts write and clear.
+
 ### The OSD is positioned by KWin, not by plasmashell
 
 The volume/brightness popup (`org.kde.plasma.workspace.osd`) only declares the Wayland role

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KROHNKITE_VERSION="0.9.9.2"
+KROHNKITE_VERSION="0.9.10.0"
 
 # Kpackagetool refuses to install over an installed package, so a rerun upgrades it instead
 function __install_kwin_script() {
@@ -15,7 +15,7 @@ function __install_kwin_script() {
 }
 
 # Krohnkite provides dwm like dynamic tiling, which is the closest one to awesome layouts
-curl -L "https://github.com/anametologin/krohnkite/releases/download/${KROHNKITE_VERSION}/krohnkite.kwinscript" -o /tmp/krohnkite.kwinscript
+curl -L "https://codeberg.org/anametologin/Krohnkite/releases/download/${KROHNKITE_VERSION}/krohnkite.kwinscript" -o /tmp/krohnkite.kwinscript
 __install_kwin_script krohnkite /tmp/krohnkite.kwinscript
 kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled true
 
@@ -80,8 +80,8 @@ kwriteconfig6 --file kwinrc --group Script-krohnkite --key layoutPerDesktop true
 # New window is appended to the stack instead of becoming master, as awful.client.setslave did
 kwriteconfig6 --file kwinrc --group Script-krohnkite --key newWindowPosition 0
 
-# Floating rules ported from awful.rules.rules of awesome
-kwriteconfig6 --file kwinrc --group Script-krohnkite --key floatingClass \
+# Floating rules ported from awful.rules.rules of awesome, a class list with no parameters floats
+kwriteconfig6 --file kwinrc --group Script-krohnkite --key floatConfig \
     "DTA,copyq,pinentry,Arandr,Blueman-manager,Gpick,Kruler,MessageWin,Sxiv,Tor Browser,Wpa_gui,veromix,xtightvncviewer"
 kwriteconfig6 --file kwinrc --group Script-krohnkite --key ignoreTitle "Event Tester"
 
