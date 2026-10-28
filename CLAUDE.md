@@ -134,6 +134,10 @@ places**, exactly as the konsole and dolphin packages ship theirs:
 - `~/.local/share/applications/<id>.desktop` provides the service that the shortcut launches.
   Without this copy the key fires and the launch fails.
 
+A `[services][<id>]` entry that matches the `.desktop`'s own `X-KDE-Shortcuts` is a default, so
+kglobalaccel drops it the next time it rewrites `kglobalshortcutsrc` — the key still works. Audit
+these against kglobalaccel, not against the file.
+
 Run `kbuildsycoca6` after adding one so the service cache picks it up. KRunner needs no entry of
 its own: it ships `/usr/share/kglobalaccel/org.kde.krunner.desktop` and is `DBusActivatable`, so
 binding `[services][org.kde.krunner.desktop]` is enough.
@@ -181,6 +185,11 @@ right: the binding does fire, it is just spelled by keysym and so breaks across 
 owned by `kwin_wayland` itself, so `setShortcutKeys`, `doRegister` and similar go straight into the
 compositor: they can kill it and take the whole session down. Read-only queries are fine; to change
 shortcuts, write the config file and log in again.
+
+This includes `setForeignShortcutKeys`, the call the shortcuts KCM itself uses, and exact `a(ai)`
+marshalling through `gdbus` does not save it — it crashed `kwin_wayland` on 6.7.4. The keys did end
+up bound, but only because the compositor restarted and re-read the config on the way back up. That
+is a crash, not a technique for applying shortcuts without logging out.
 
 `kwriteconfig6` parses a bare `-1` as a command line flag and fails with `Unknown option '1'`,
 so a negative value needs the `--` separator before it.
