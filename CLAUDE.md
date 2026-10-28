@@ -321,6 +321,9 @@ concatenates the output of every `print`, so they arrive as one space-separated 
   update, so `install_chrome.sh` installs the direct `.deb` and lets the package own the repo.
   Claude Desktop adds its own `.list` only when no other source has the repo, so
   `install_claude_desktop.sh` writes the `.sources` and the package stands back.
+- One repo serving several products gets its own `setup_<vendor>_repository.sh` stage, sourced
+  in `install.sh` before every product that needs it: `setup_microsoft_repository.sh` serves
+  VS Code and .NET.
 - Comment style differs from the usual no-comments rule: scripts use short comments to say what
   an opaque `apt`/`kwriteconfig6`/`sed` line is for, and to preserve deliberately disabled
   alternatives. **One line each** — say why, not what. When a block needs two explanations, put
