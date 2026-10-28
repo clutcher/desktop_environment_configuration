@@ -239,6 +239,15 @@ monitor to γ activated its window on the right one and pulled the right monitor
 Behaviour KCM writes the whole group out on exit, so the key is set explicitly rather than left
 to the default.
 
+### The active screen is not the screen under the pointer
+
+New Wayland windows are placed on `Workspace::activeOutput()`, which follows the pointer *except*
+that `Window::sendToOutput` and `switchToOutput` also set it. So after `Meta+Esc` or `Ctrl+1/2/3`
+the active screen is the one just moved or switched to while the pointer sits elsewhere, and the
+next launcher opens its window there. KWin 6 dropped the old `ActiveMouseScreen` option; the fix is
+`[Windows] Placement=UnderMouse`, because `Placement::placeUnderMouse` resolves its screen area from
+`Cursors::self()->mouse()->pos()` and ignores the active output entirely.
+
 ### The OSD is positioned by KWin, not by plasmashell
 
 The volume/brightness popup (`org.kde.plasma.workspace.osd`) only declares the Wayland role

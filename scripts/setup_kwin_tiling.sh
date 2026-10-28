@@ -39,6 +39,9 @@ kwriteconfig6 --file kwinrc --group Windows --key AutoRaise false
 kwriteconfig6 --file kwinrc --group Windows --key ClickRaise true
 kwriteconfig6 --file kwinrc --group Windows --key DelayFocusInterval 0
 
+# New windows open under the pointer, as kwin's active screen keeps the last one moved or switched to
+kwriteconfig6 --file kwinrc --group Windows --key Placement UnderMouse
+
 # Pointer crosses monitor edges and corners freely, instead of being held back at them
 kwriteconfig6 --file kwinrc --group EdgeBarrier --key EdgeBarrier 0
 kwriteconfig6 --file kwinrc --group EdgeBarrier --key CornerBarrier false
