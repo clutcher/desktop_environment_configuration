@@ -122,6 +122,11 @@ kwriteconfig6 --file kxkbrc --group Layout --key VariantList ","
 kwriteconfig6 --file kxkbrc --group Layout --key Options "grp:caps_toggle"
 kwriteconfig6 --file kxkbrc --group Layout --key ResetOldOptions true
 
+# Time is shown in 24 hour format, which en_US lacks, while the rest of the session stays en_US
+sudo sed -i 's/^# en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
+sudo locale-gen
+kwriteconfig6 --file plasma-localerc --group Formats --key LC_TIME en_GB.UTF-8
+
 # Store screenshots with the same name pattern as awesome did
 mkdir -p ~/screenshots
 kwriteconfig6 --file spectaclerc --group General --key autoSaveImage true
