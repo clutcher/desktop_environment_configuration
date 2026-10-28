@@ -22,6 +22,9 @@ kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled true
 # Every monitor switches desktops independently, which replaces per screen tags of awesome
 kwriteconfig6 --file kwinrc --group Windows --key PerOutputVirtualDesktops true
 
+# Focus after a desktop switch stays on that monitor, instead of dragging another one along
+kwriteconfig6 --file kwinrc --group Windows --key SeparateScreenFocus true
+
 kwriteconfig6 --file kwinrc --group Desktops --key Number 5
 kwriteconfig6 --file kwinrc --group Desktops --key Rows 1
 kwriteconfig6 --file kwinrc --group Desktops --key Name_1 "α"

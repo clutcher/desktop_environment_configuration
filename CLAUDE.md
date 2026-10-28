@@ -221,6 +221,24 @@ no longer reads them, so writing them fails with no error. On a version bump, di
 `<entry name=...>` keys of `contents/config/main.xml` and the `Krohnkite*` action names in
 `contents/ui/shortcuts.qml` against what the scripts write and clear.
 
+### A desktop switch on one monitor could drag another monitor with it
+
+`Workspace::updateWindowVisibilityAndActivateOnDesktopChange` ends in
+`activateWindowOnDesktop(newDesktop)` → `findWindowToActivateOnDesktop` →
+`FocusChain::getForActivation(desktop)`. That chain is keyed by desktop alone, so with
+`SeparateScreenFocus` off it returns the most recently used window on that desktop **on any
+output**. `Workspace::activateWindow` then finds `!window->isOnCurrentDesktop()` and, under the
+default `[Windows] ActivationDesktopPolicy=SwitchToOtherDesktop`, runs
+`setCurrent(window->desktops().constLast(), window->output())` — which switches *that* monitor.
+
+So an application with a window on desktop γ of two monitors was enough: switching the left
+monitor to γ activated its window on the right one and pulled the right monitor to γ as well.
+`[Windows] SeparateScreenFocus=true` adds the `window->output() == output` test to
+`getForActivation` and to `isUsableFocusCandidate`, which covers the window-hidden path
+(`activateNextWindow` → `nextForDesktop`) too. Its kcfg default is already `true`; the Window
+Behaviour KCM writes the whole group out on exit, so the key is set explicitly rather than left
+to the default.
+
 ### The OSD is positioned by KWin, not by plasmashell
 
 The volume/brightness popup (`org.kde.plasma.workspace.osd`) only declares the Wayland role
