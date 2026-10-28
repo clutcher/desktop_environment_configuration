@@ -146,6 +146,29 @@ Meta+Return is `0x11000004` = 285212676):
 `qdbus6 --literal org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel.getGlobalShortcutsByKey <code>`.
 An empty result means nothing holds the key, whatever the config file says.
 
+**On Wayland a shift that xkb consumed never reaches the shortcut, but the shifted keysym does.**
+`Xkb::modifiersRelevantForGlobalShortcuts` returns `mods & ~consumedMods`, and on the digit row shift
+is what selects the second level (`key <AE01> { [ 1, exclam ] }`), so KWin strips it. The keysym is
+still `exclam`, and `QXkbCommon::keysymToQtKey` substitutes the unshifted Latin key only
+`if (!isLatin1(keysym))` — every shifted digit is Latin-1, so nothing substitutes. `Meta+Shift+1`
+therefore arrives as `Meta+!`, which *is* bindable; it does not arrive as `Meta+1`. Letters go the
+other way: KWin puts shift back for them (BUG 370341), which is why `Meta+Shift+H/J/K/L/C` work, and
+Cyrillic keysyms are not Latin-1 so they do substitute back to the us letter — which is why those
+keep working on the ru layout.
+
+`Window to Desktop 1..5` is therefore bound to the shifted symbol of **both** configured layouts,
+since us and ru disagree on the digit row (`@ $ %` against `" * :`) and Latin-1 blocks the
+substitution that rescues the letters. `Meta+Ctrl+1..5` stays as a layout proof fallback. Keys whose
+second level needs alt rather than shift never lose the modifier — `<PRSC>` is `PC_ALT_LEVEL2`, so
+`Meta+Shift+Print` works as spelled.
+
+The open report is <https://bugs.kde.org/show_bug.cgi?id=522619>, filed against the numpad but the
+same `modifiersRelevantForGlobalShortcuts` line; watch it for a fix, and collapse the per layout
+symbols back to plain `Meta+Shift+1..5` when one lands. Do not track 370341 (the letter exception,
+fixed in 5.8.2) or 434988 (the KCM showing `Meta+!`), where the WONTFIX argument turns out to be
+right: the binding does fire, it is just spelled by keysym and so breaks across layouts, which is
+415289.
+
 **Never make mutating DBus calls against a running session.** On Wayland `org.kde.kglobalaccel` is
 owned by `kwin_wayland` itself, so `setShortcutKeys`, `doRegister` and similar go straight into the
 compositor: they can kill it and take the whole session down. Read-only queries are fine; to change

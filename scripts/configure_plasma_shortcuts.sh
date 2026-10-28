@@ -57,11 +57,20 @@ __set_service_shortcut "org.kde.spectacle.desktop" "ActiveWindowScreenShot" "non
 # System monitor ships Meta+Esc, spelled Esc not Escape, which awesome used for the next screen
 __set_service_shortcut "org.kde.plasma-systemmonitor.desktop" "_launch" "Meta+S"
 
-# Tags
+# Tags. Xkb consumes the shift on the digit row, so Meta+Shift+1 arrives as Meta+exclam, spelled
+# per layout because us and ru disagree, with Meta+Ctrl as the layout proof fallback
+declare -A __move_to_desktop_keys=(
+    [1]=$'Meta+!\tMeta+Ctrl+1'
+    [2]=$'Meta+@\tMeta+"\tMeta+Ctrl+2'
+    [3]=$'Meta+#\tMeta+Ctrl+3'
+    [4]=$'Meta+$\tMeta+*\tMeta+Ctrl+4'
+    [5]=$'Meta+%\tMeta+:\tMeta+Ctrl+5'
+)
 for tag in {1..5}; do
     __set_shortcut kwin "Switch to Desktop $tag" "Meta+$tag"
-    __set_shortcut kwin "Window to Desktop $tag" "Meta+Shift+$tag"
+    __set_shortcut kwin "Window to Desktop $tag" "${__move_to_desktop_keys[$tag]}"
 done
+unset __move_to_desktop_keys
 __set_shortcut kwin "Switch One Desktop to the Left" "Meta+Left"
 __set_shortcut kwin "Switch One Desktop to the Right" "Meta+Right"
 
