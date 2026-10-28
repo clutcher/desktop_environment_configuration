@@ -1,14 +1,5 @@
 #!/bin/bash
 
-wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/google-chrome.gpg
-sudo tee /etc/apt/sources.list.d/google-chrome.sources > /dev/null <<EOT
-Types: deb
-URIs: https://dl.google.com/linux/chrome/deb/
-Suites: stable
-Components: main
-Architectures: amd64
-Signed-By: /etc/apt/keyrings/google-chrome.gpg
-EOT
-
-sudo apt update
-sudo apt install -y google-chrome-stable
+# Chrome's package registers its own apt repository and rewrites it on every update, so it is not written here
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb
+sudo apt install -y /tmp/google-chrome.deb
