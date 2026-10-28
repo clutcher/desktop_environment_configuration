@@ -15,8 +15,10 @@ cat <<EOT > ~/.config/user-dirs.conf
 enabled=False
 EOT
 
-# Generate new ssh keys
-ssh-keygen -t rsa -C "iclutcher@gmail.com" -f ~/.ssh/id_rsa -q -N ""
+# Generate ssh keys once, a rerun must never replace the key already registered on remote hosts
+if [ ! -f ~/.ssh/id_rsa ]; then
+    ssh-keygen -t rsa -C "iclutcher@gmail.com" -f ~/.ssh/id_rsa -q -N ""
+fi
 
 # Git settings
 git config --global user.name "Igor Zarvanskyi"

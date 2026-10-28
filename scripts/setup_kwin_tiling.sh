@@ -2,9 +2,21 @@
 
 KROHNKITE_VERSION="0.9.9.2"
 
+# Kpackagetool refuses to install over an installed package, so a rerun upgrades it instead
+function __install_kwin_script() {
+    local plugin_id="$1"
+    local package_path="$2"
+
+    if kpackagetool6 --type=KWin/Script --show "$plugin_id" > /dev/null 2>&1; then
+        kpackagetool6 --type=KWin/Script --upgrade "$package_path"
+    else
+        kpackagetool6 --type=KWin/Script --install "$package_path"
+    fi
+}
+
 # Krohnkite provides dwm like dynamic tiling, which is the closest one to awesome layouts
 curl -L "https://github.com/anametologin/krohnkite/releases/download/${KROHNKITE_VERSION}/krohnkite.kwinscript" -o /tmp/krohnkite.kwinscript
-kpackagetool6 --type=KWin/Script --install /tmp/krohnkite.kwinscript
+__install_kwin_script krohnkite /tmp/krohnkite.kwinscript
 kwriteconfig6 --file kwinrc --group Plugins --key krohnkiteEnabled true
 
 # Every monitor switches desktops independently, which replaces per screen tags of awesome
@@ -43,7 +55,7 @@ kwriteconfig6 --file kwinrulesrc --group 1 --key noborder true
 kwriteconfig6 --file kwinrulesrc --group 1 --key noborderrule 2
 
 # Kwin centers volume and brightness popups with no setting to move them, so a script does it
-kpackagetool6 --type=KWin/Script --install configs/kwin/osd-top-right
+__install_kwin_script osdtopright configs/kwin/osd-top-right
 kwriteconfig6 --file kwinrc --group Plugins --key osdtoprightEnabled true
 
 # Only tile layout was enabled in awesome, monocle and floating are kept as fallback
@@ -72,3 +84,5 @@ kwriteconfig6 --file kwinrc --group Script-krohnkite --key newWindowPosition 0
 kwriteconfig6 --file kwinrc --group Script-krohnkite --key floatingClass \
     "DTA,copyq,pinentry,Arandr,Blueman-manager,Gpick,Kruler,MessageWin,Sxiv,Tor Browser,Wpa_gui,veromix,xtightvncviewer"
 kwriteconfig6 --file kwinrc --group Script-krohnkite --key ignoreTitle "Event Tester"
+
+unset -f __install_kwin_script

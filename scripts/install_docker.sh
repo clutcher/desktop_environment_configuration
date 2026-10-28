@@ -3,7 +3,7 @@
 sudo apt remove -y docker docker-engine docker.io containerd runc
 
 # Docker publishes no sid suite, so the repository follows the current debian stable
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOT
 Types: deb
 URIs: https://download.docker.com/linux/debian/

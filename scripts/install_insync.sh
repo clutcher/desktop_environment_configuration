@@ -1,6 +1,6 @@
 #!/bin/bash
 
-wget -q "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xaeeb94e9c5a3b54ecfa4a66aa684470caccaf35c" -O- | sudo gpg --dearmor -o /etc/apt/keyrings/insynchq.gpg
+wget -q "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xaeeb94e9c5a3b54ecfa4a66aa684470caccaf35c" -O- | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/insynchq.gpg
 sudo tee /etc/apt/sources.list.d/insync.sources > /dev/null <<EOT
 Types: deb
 URIs: http://apt.insync.io/debian/

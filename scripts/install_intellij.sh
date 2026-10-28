@@ -4,6 +4,8 @@ sudo cp configs/sysctl/60-jetbrains.conf /etc/sysctl.d/60-jetbrains.conf
 sudo sysctl --system
 
 # Direct download gives the latest release, while toolbox cli requires an exact build number
+# Previous release is removed first, as its leftover jars and plugins break the new one
+sudo rm -rf /opt/idea
 sudo mkdir -p /opt/idea
 sudo curl -L "https://download.jetbrains.com/product?code=IIU&latest&distribution=linux" | sudo tar xz -C /opt/idea --strip 1
 sudo chown -R "$(id -u):$(id -g)" /opt/idea

@@ -31,10 +31,22 @@ repository root. They are `source`d rather than executed, sharing one shell, and
 on that: `install_java.sh` sources sdkman and `install_nodejs.sh` sources nvm into the shell, so
 `sdk` and `nvm` are callable by whatever runs after them.
 
-Most stages are **not idempotent** (`apt install`, `ssh-keygen`, `curl` into `/opt`).
-`setup_dotfiles.sh` is the exception: it deletes and re-appends its
-`# BEGIN desktop_environment_configuration` … `# END desktop_environment_configuration` block in
-`~/.bashrc`. Preserve that marker pattern when touching it.
+Every stage is **safe to run again**, alone or as a full `./install.sh`, and a new stage must stay
+that way: a rerun converges on the same result and brings fetched software up to date. The
+patterns that keep it so:
+
+- Vendor keyrings are dearmored with `gpg --batch --yes`. Without it gpg asks before overwriting
+  the existing keyring, finds no tty under `sudo` and fails, so the repository loses its key.
+- One-off generated secrets are guarded: `ssh-keygen` runs only when `~/.ssh/id_rsa` is missing,
+  because overwriting it would orphan the key registered on remote hosts.
+- Releases unpacked into `/opt` remove the previous tree first, since stale jars and plugins from an
+  older IntelliJ break the new one.
+- KWin scripts go through `__install_kwin_script`, which upgrades an installed package:
+  `kpackagetool6 --install` fails on an existing one and `--upgrade` on a missing one.
+- `setup_dotfiles.sh` deletes and re-appends its `# BEGIN desktop_environment_configuration` …
+  `# END desktop_environment_configuration` block in `~/.bashrc`. Preserve that marker pattern.
+- Write a deployed file whole, or edit it by key with `kwriteconfig6`, rather than appending to or
+  patching it in place: a second run would apply the append or patch twice.
 
 ## Repository layout and how the pieces reach the system
 
@@ -78,11 +90,11 @@ profile and colorscheme, `.desktop` files.
 `kwriteconfig6` is a plain INI writer, so every configure step works with no session and no DBus.
 Two things to respect when adding stages:
 
-- **Write for a clean install.** Scripts assume a console-only Debian with nothing from a previous
-  desktop present. No backing up existing Plasma config, no disabling other display managers, no
-  upgrade-if-already-installed fallbacks — none of that exists on a fresh box, and defensive
-  handling for it is noise. Config is read at first login, so there is also nothing to reload
-  after writing it.
+- **Write for a clean install or a rerun of this repo, nothing else.** Scripts assume a
+  console-only Debian, or one this repo already provisioned. No backing up existing Plasma config,
+  no disabling other display managers — no foreign desktop exists on the box, and defensive
+  handling for it is noise. Config is read at login, so there is also nothing to reload after
+  writing it; a rerun takes effect at the next login.
 - **`libkf6config-bin` provides `kwriteconfig6`** and is installed first in `setup_plasma_de.sh`.
   Other tools: `kbuildsycoca6` → `libkf6service-bin`, `kpackagetool6` (own package),
   `qdbus6` → `qdbus-qt6`. No metapackages (`kde-full`, `kde-standard`) — the package list is
