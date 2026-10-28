@@ -68,6 +68,14 @@ function addTasksWidget(panel) {
     tasks.reloadConfig();
 }
 
+function addBatteryWidget(panel) {
+    var battery = panel.addWidget("org.kde.plasma.battery");
+
+    battery.currentConfigGroup = ["General"];
+    battery.writeConfig("showPercentage", true);
+    battery.reloadConfig();
+}
+
 function addClockWidget(panel) {
     var clock = panel.addWidget("org.kde.plasma.digitalclock");
 
@@ -93,7 +101,7 @@ for (var screen = 0; screen < screenCount; screen++) {
     // Indicators and tray are needed once, so they live on the primary screen only
     if (screen === 0) {
         addSensorsWidget(panel, ["memory/physical/used", "cpu/all/usage", "cpu/all/averageTemperature"]);
-        panel.addWidget("org.kde.plasma.battery");
+        addBatteryWidget(panel);
         panel.addWidget("org.kde.plasma.keyboardindicator");
         panel.addWidget("org.kde.plasma.systemtray");
     }
