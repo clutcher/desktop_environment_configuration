@@ -1,0 +1,85 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(mkdir:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:github.com)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "opus",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude-shared/hooks/commit-message-check.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"$HOME\"/.claude-shared/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "plugin-dev@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "laminar@laminar-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    },
+    "anthropic-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills"
+      }
+    },
+    "laminar-skills": {
+      "source": {
+        "source": "github",
+        "repo": "clutcher/laminar-skills"
+      }
+    },
+    "book-writing-skills": {
+      "source": {
+        "source": "github",
+        "repo": "clutcher/book-writing-skills"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skipWorkflowUsageWarning": true,
+  "autoCompactEnabled": true,
+  "idleCompaction": true,
+  "switchModelsOnFlag": false,
+  "remoteControlAtStartup": false,
+  "skipAutoPermissionPrompt": true
+}
