@@ -25,6 +25,7 @@ source scripts/install_chrome.sh
 source scripts/install_claude_desktop.sh
 
 source scripts/setup_dotfiles.sh
+source scripts/setup_claude_profiles.sh deploy-files install-tooling
 
 # Dev tools
 source scripts/install_java.sh
