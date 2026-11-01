@@ -1,0 +1,131 @@
+#!/bin/bash
+
+shared_dir="${CLAUDE_SHARED_DIR:-$HOME/.claude-shared}"
+snapshot_dir="$shared_dir/.deployed"
+repo_config_dir="${CLAUDE_REPO_CONFIG_DIR:-}"
+
+resolve_repo_config_dir() {
+    if [[ -n "$repo_config_dir" ]]; then
+        return 0
+    fi
+    if [[ ! -f "$snapshot_dir/.repo-config-dir" ]]; then
+        printf 'Repo copy unknown: set CLAUDE_REPO_CONFIG_DIR or run setup_claude_profiles.sh deploy-files\n' >&2
+        return 1
+    fi
+    repo_config_dir=$(<"$snapshot_dir/.repo-config-dir")
+}
+
+list_profile_env_keys() {
+    jq -r '(.env // {}) | keys[] | select(test("^(CLAUDE_CODE_USE_.*|AWS_.*|ANTHROPIC_.*|CLOUD_ML_REGION)$"))' "$1" 2>/dev/null
+}
+
+same_content() {
+    [[ -f "$1" && -f "$2" ]] && cmp -s "$1" "$2"
+}
+
+classify_file() {
+    local file=$1
+    local repo_copy="$repo_config_dir/$file"
+    local deployed_copy="$shared_dir/$file"
+    local snapshot_copy="$snapshot_dir/$file"
+
+    if [[ ! -f "$deployed_copy" ]]; then
+        echo missing-deployed
+    elif same_content "$deployed_copy" "$repo_copy"; then
+        if same_content "$deployed_copy" "$snapshot_copy"; then echo in-sync; else echo converged; fi
+    elif [[ ! -f "$snapshot_copy" ]]; then
+        echo unknown-baseline
+    elif same_content "$deployed_copy" "$snapshot_copy"; then
+        echo repo-ahead
+    elif same_content "$repo_copy" "$snapshot_copy"; then
+        echo deployed-drift
+    else
+        echo conflict
+    fi
+}
+
+show_diffs() {
+    local file=$1 state=$2
+    local repo_copy="$repo_config_dir/$file"
+    local deployed_copy="$shared_dir/$file"
+    local snapshot_copy="$snapshot_dir/$file"
+
+    case $state in
+        repo-ahead) diff -u "$deployed_copy" "$repo_copy" ;;
+        deployed-drift) diff -u "$snapshot_copy" "$deployed_copy" ;;
+        conflict)
+            diff -u "$snapshot_copy" "$deployed_copy"
+            diff -u "$snapshot_copy" "$repo_copy"
+            ;;
+        unknown-baseline) diff -u "$deployed_copy" "$repo_copy" ;;
+    esac
+    return 0
+}
+
+plain_file_pairs() {
+    printf '%s\n' "settings.json settings.base.json" "statusline-command.sh statusline-command.sh"
+    (cd "$repo_config_dir" && find hooks -type f -not -path '*/tests/*' -not -path '*/__pycache__/*' -not -path '*/.pytest_cache/*' -not -name 'test_*' -not -name '*.pyc' | sort | sed 's/.*/& &/')
+}
+
+classify_plain_file() {
+    local repo_copy="$repo_config_dir/$1"
+    local deployed_copy="$shared_dir/$2"
+
+    if [[ ! -f "$deployed_copy" ]]; then
+        echo missing-deployed
+    elif same_content "$deployed_copy" "$repo_copy"; then
+        echo in-sync
+    else
+        echo differs
+    fi
+}
+
+report_plain_files() {
+    local show_diff_flag=$1
+    local repo_name deployed_name state drifted=0
+
+    while read -r repo_name deployed_name; do
+        state=$(classify_plain_file "$repo_name" "$deployed_name")
+        printf '%-16s %s\n' "$state" "$deployed_name"
+        [[ "$state" == in-sync ]] && continue
+        drifted=1
+        [[ "$show_diff_flag" == yes && "$state" == differs ]] && { diff -u "$shared_dir/$deployed_name" "$repo_config_dir/$repo_name"; true; }
+    done < <(plain_file_pairs)
+    return "$drifted"
+}
+
+report_claude_instructions() {
+    local show_diff_flag=$1
+    local file=CLAUDE.md
+    local state
+    state=$(classify_file "$file")
+
+    printf '%-16s %s\n' "$state" "$file"
+    [[ "$state" == in-sync ]] && return 0
+    [[ "$show_diff_flag" == yes ]] && show_diffs "$file" "$state"
+    return 1
+}
+
+report_all_files() {
+    local show_diff_flag=$1 drifted=0
+    report_plain_files "$show_diff_flag" || drifted=1
+    report_claude_instructions "$show_diff_flag" || drifted=1
+    return "$drifted"
+}
+
+if [[ "${1:-}" == profile-env-keys ]]; then
+    list_profile_env_keys "$2"
+    exit 0
+fi
+
+resolve_repo_config_dir || exit 2
+
+case "${1:-}" in
+    state) classify_file "$2" ;;
+    -d|--diff) report_all_files yes ;;
+    "") report_all_files no ;;
+    *)
+        printf 'Usage: claude-settings-diff [-d|--diff] | state FILE | profile-env-keys FILE\n' >&2
+        exit 2
+        ;;
+esac

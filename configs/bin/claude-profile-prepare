@@ -1,0 +1,461 @@
+#!/bin/bash
+
+shared_dir="${CLAUDE_SHARED_DIR:-$HOME/.claude-shared}"
+profiles_home="${CLAUDE_PROFILES_HOME:-$HOME}"
+claude_command="${CLAUDE_COMMAND:-claude}"
+
+linked_items=(projects history.jsonl CLAUDE.md skills agents commands file-history paste-cache)
+
+settings_comparison_jq='
+def canonical: walk(if type == "object" then to_entries | sort_by(.key) | from_entries else . end);
+def pointer: map(tostring | gsub("~"; "~0") | gsub("/"; "~1")) | "/" + join("/");
+def safe_get($path): try getpath($path) catch null;
+def leaf_paths: def descend($prefix): if type == "object" then (keys_unsorted[] as $key | .[$key] | descend($prefix + [$key])) else $prefix end; descend([]);
+def contains_element($element): any(.[]; canonical == ($element | canonical));
+def differs($expected; $actual):
+    if ($expected | type) == "array" then
+        ($actual | type) != "array" or any($expected[]; . as $element | ($actual | contains_element($element) | not))
+    else $expected != $actual end;
+def is_ignored($pointer; $ignored): any($ignored[]; . as $prefix | $pointer == $prefix or ($pointer | startswith($prefix + "/")));
+def is_stale_element($element; $current): ($current | type) != "array" or ($current | contains_element($element) | not);
+def unit_path($base; $profile):
+    . as $path
+    | if ($path | length) > 3 and $path[0] == "extraKnownMarketplaces" and $path[2] == "source" then
+        ($path[:3]) as $unit
+        | ($profile | safe_get($unit + ["source"])) as $actual_kind
+        | if $actual_kind != null and $actual_kind != ($base | safe_get($unit + ["source"])) then $unit else $path end
+      else $path end;
+def deviating_paths($profile; $ignored):
+    . as $base
+    | [leaf_paths as $path
+        | ($base | getpath($path)) as $expected
+        | select(differs($expected; $profile | safe_get($path)))
+        | $path | unit_path($base; $profile)]
+    | reduce .[] as $path ([]; if index([$path]) != null then . else . + [$path] end)
+    | .[]
+    | select(is_ignored(pointer; $ignored) | not);
+def removal_paths($previous; $base; $ignored):
+    . as $profile
+    | ($previous | leaf_paths) as $path
+    | ($previous | getpath($path)) as $old
+    | ($base | safe_get($path)) as $current
+    | ($profile | safe_get($path)) as $actual
+    | select(is_ignored($path | pointer; $ignored) | not)
+    | select(
+        if ($old | type) == "array" then
+            ($actual | type) == "array" and any($old[]; . as $element | ($actual | contains_element($element)) and is_stale_element($element; $current))
+        else $old != null and $current == null and $actual == $old end)
+    | $path;
+def ensure_object_parents($path):
+    reduce range(1; $path | length) as $depth (.; ($path[:$depth]) as $prefix | if (safe_get($prefix) | type) != "object" then setpath($prefix; {}) else . end);
+def with_base_value($path; $expected):
+    ensure_object_parents($path)
+    | if ($expected | type) == "array" then
+        (safe_get($path)) as $actual
+        | (if ($actual | type) == "array" then $actual else [] end) as $current
+        | setpath($path; $current + [$expected[] | . as $element | select($current | contains_element($element) | not)])
+      else setpath($path; $expected) end;
+def without_stale_value($path; $previous; $base):
+    ($previous | getpath($path)) as $old
+    | ($base | safe_get($path)) as $current
+    | if ($old | type) == "array" then
+        [getpath($path)[] | . as $element | select(($old | contains_element($element) | not) or ($current | type) == "array" and ($current | contains_element($element)))] as $kept
+        | if ($kept | length) == 0 and $current == null then delpaths([$path]) else setpath($path; $kept) end
+      else delpaths([$path]) end;
+def findings($base; $previous; $ignored):
+    if type != "object" then error("settings.json is not an object") else . end
+    | . as $profile
+    | ($base | deviating_paths($profile; $ignored) | "differs\t" + pointer),
+      ($profile | removal_paths($previous; $base; $ignored) | "removed\t" + pointer);
+def settled($base; $previous; $ignored):
+    . as $profile
+    | reduce ($profile | removal_paths($previous; $base; $ignored)) as $path ($profile; without_stale_value($path; $previous; $base))
+    | . as $cleaned
+    | reduce ($base | deviating_paths($cleaned; $ignored)) as $path ($cleaned; with_base_value($path; $base | getpath($path)));
+def overlaps($base; $remote):
+    ($base | leaf_paths) as $path | select(($remote | safe_get($path)) != null) | "overridden\t" + ($path | pointer);
+'
+
+mode=check
+include_plugins=yes
+verbose=no
+profile=
+profile_dir=
+settings_file=
+base_file=
+previous_base_file=
+relink_markers_dir=
+relink_marker=
+unfixable_problem_count=0
+fix_failure_count=0
+differing_pointers=()
+removed_pointers=()
+missing_plugins=()
+missing_marketplace_entries=()
+
+print_usage() {
+    printf 'Usage: claude-profile-prepare [--check | --fix] [--no-plugins] [--verbose] PROFILE\n' >&2
+    printf 'Never creates a profile folder; links an existing profile only when $CLAUDE_SHARED_DIR/.relink-markers/PROFILE exists; seeds an absent settings.json, then compares settings.json and plugins with the base; --fix applies the base and installs plugins.\n' >&2
+    printf 'Does nothing when the shared store ($CLAUDE_SHARED_DIR, default ~/.claude-shared) does not exist, when the profile directory does not exist, or when it holds a .no-shared file.\n' >&2
+}
+
+fail() {
+    printf 'claude-profile-prepare: %s\n' "$1" >&2
+    exit 2
+}
+
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --check) mode=check ;;
+            --fix) mode=fix ;;
+            --no-plugins) include_plugins=no ;;
+            -v|--verbose) verbose=yes ;;
+            -*) print_usage; exit 2 ;;
+            *)
+                [[ -z "$profile" ]] || { print_usage; exit 2; }
+                profile=$1
+                ;;
+        esac
+        shift
+    done
+    [[ -n "$profile" ]] || { print_usage; exit 2; }
+}
+
+validate_profile_name() {
+    [[ "$profile" =~ ^[a-z0-9-]+$ ]] || fail "invalid profile name \"$profile\" (allowed: a-z, 0-9, -)"
+    [[ "$profile" != shared ]] || fail 'profile name "shared" is reserved'
+}
+
+is_profile_marked_for_linking() {
+    [[ -e "$relink_marker" ]]
+}
+
+create_shared_source() {
+    local item=$1 source=$2
+    case $item in
+        history.jsonl) [[ -e "$source" ]] || touch "$source" ;;
+        CLAUDE.md) ;;
+        *) mkdir -p "$source" ;;
+    esac
+}
+
+is_empty_entry() {
+    if [[ -d "$1" ]]; then
+        [[ -z "$(ls -A "$1")" ]]
+    else
+        [[ ! -s "$1" ]]
+    fi
+}
+
+remove_empty_entry() {
+    if [[ -d "$1" ]]; then rmdir "$1"; else rm "$1"; fi
+}
+
+links_to_source() {
+    local target=$1 source=$2
+    [[ -L "$target" ]] || return 1
+    [[ "$(readlink "$target")" == "$source" ]] || [[ "$(readlink -f "$target")" == "$(readlink -f "$source")" ]]
+}
+
+warn_not_linked() {
+    printf 'not linked: %s %s: run the migration\n' "$1" "$2"
+    unfixable_problem_count=$((unfixable_problem_count + 1))
+}
+
+link_shared_item() {
+    local item=$1
+    local source="$shared_dir/$item"
+    local target="$profile_dir/$item"
+
+    create_shared_source "$item" "$source"
+
+    if [[ -L "$target" ]]; then
+        links_to_source "$target" "$source" || warn_not_linked "$target" "is a link to $(readlink "$target")"
+        return 0
+    fi
+    if [[ -e "$target" ]]; then
+        is_empty_entry "$target" || { warn_not_linked "$target" "is a real entry with content"; return 0; }
+        remove_empty_entry "$target"
+    fi
+
+    ln -sT "$source" "$target" 2> /dev/null || links_to_source "$target" "$source" || warn_not_linked "$target" "could not be linked"
+}
+
+link_shared_items() {
+    local item
+    for item in "${linked_items[@]}"; do
+        link_shared_item "$item"
+    done
+}
+
+seed_settings() {
+    local temporary_file
+    temporary_file=$(mktemp "$profile_dir/.settings.json.XXXXXX") || return 1
+    cp "$base_file" "$temporary_file"
+    if ln "$temporary_file" "$settings_file" 2> /dev/null; then
+        printf 'seeded settings.json from the base\n'
+    fi
+    rm -f "$temporary_file"
+}
+
+read_ignored_pointers_json() {
+    local ignore_file="$profile_dir/shared-settings.ignore"
+    if [[ ! -f "$ignore_file" ]]; then
+        printf '[]'
+        return 0
+    fi
+    jq -R -s -c 'split("\n") | map(select(length > 0))' "$ignore_file"
+}
+
+read_previous_base_json() {
+    [[ -f "$previous_base_file" ]] && jq -c 'if type == "object" then . else {} end' "$previous_base_file" 2> /dev/null || printf '{}'
+}
+
+find_settings_findings() {
+    local ignored_json previous_json findings line
+    ignored_json=$(read_ignored_pointers_json)
+    previous_json=$(read_previous_base_json)
+    [[ -n "$previous_json" ]] || previous_json='{}'
+
+    findings=$(jq -r --slurpfile base "$base_file" --argjson previous "$previous_json" --argjson ignored "$ignored_json" \
+        "$settings_comparison_jq"' findings($base[0]; $previous; $ignored)' "$settings_file" 2> /dev/null) || return 1
+
+    while IFS=$'\t' read -r kind line; do
+        case $kind in
+            differs) differing_pointers+=("$line") ;;
+            removed) removed_pointers+=("$line") ;;
+        esac
+    done <<< "$findings"
+}
+
+check_settings() {
+    if [[ ! -f "$base_file" ]]; then
+        printf 'settings and plugins not checked: %s is missing (run deploy-files)\n' "$base_file"
+        return 0
+    fi
+    if [[ ! -e "$settings_file" ]]; then
+        seed_settings
+        return 0
+    fi
+    if ! find_settings_findings; then
+        printf 'settings.json is malformed: not checked, not changed\n'
+        unfixable_problem_count=$((unfixable_problem_count + 1))
+    fi
+}
+
+apply_base_to_settings() {
+    local ignored_json previous_json temporary_file
+    ignored_json=$(read_ignored_pointers_json)
+    previous_json=$(read_previous_base_json)
+    [[ -n "$previous_json" ]] || previous_json='{}'
+    temporary_file=$(mktemp "$profile_dir/.settings.json.XXXXXX") || return 1
+
+    if jq --slurpfile base "$base_file" --argjson previous "$previous_json" --argjson ignored "$ignored_json" \
+        "$settings_comparison_jq"' settled($base[0]; $previous; $ignored)' "$settings_file" > "$temporary_file"; then
+        chmod 600 "$temporary_file"
+        mv "$temporary_file" "$settings_file"
+    else
+        rm -f "$temporary_file"
+        printf 'could not apply the base to settings.json\n'
+        fix_failure_count=$((fix_failure_count + 1))
+        return 1
+    fi
+}
+
+fix_settings() {
+    local pointer
+    [[ $((${#differing_pointers[@]} + ${#removed_pointers[@]})) -gt 0 ]] || return 0
+    apply_base_to_settings || return 0
+    for pointer in "${removed_pointers[@]}"; do
+        printf 'removed from base: settings.json %s\n' "$pointer"
+    done
+    for pointer in "${differing_pointers[@]}"; do
+        printf 'fixed settings.json: %s\n' "$pointer"
+    done
+}
+
+report_remote_settings() {
+    local remote_file="$profile_dir/remote-settings.json"
+    local overlaps="" kind pointer
+    [[ -f "$remote_file" && -f "$base_file" ]] || return 0
+
+    while IFS=$'\t' read -r kind pointer; do
+        case $kind in
+            overridden) overlaps+="${overlaps:+, }$pointer" ;;
+            hooks-only) printf 'warning: remote-settings has allowManagedHooksOnly: profile hooks are ignored\n' ;;
+        esac
+    done < <(jq -r --slurpfile base "$base_file" \
+        "$settings_comparison_jq"' (. as $remote | overlaps($base[0]; $remote)), (if .allowManagedHooksOnly == true then "hooks-only\t" else empty end)' "$remote_file" 2> /dev/null)
+    [[ -z "$overlaps" ]] || printf 'overridden by remote-settings: %s\n' "$overlaps"
+}
+
+find_missing_plugins() {
+    local installed_json known_marketplaces_json
+    local installed_file="$profile_dir/plugins/installed_plugins.json"
+    local known_marketplaces_file="$profile_dir/plugins/known_marketplaces.json"
+
+    installed_json=$([[ -f "$installed_file" ]] && jq -c '(.plugins // {}) | keys' "$installed_file" 2> /dev/null || printf '[]')
+    known_marketplaces_json=$([[ -f "$known_marketplaces_file" ]] && jq -c 'keys' "$known_marketplaces_file" 2> /dev/null || printf '[]')
+    [[ -n "$installed_json" ]] || installed_json='[]'
+    [[ -n "$known_marketplaces_json" ]] || known_marketplaces_json='[]'
+
+    mapfile -t missing_plugins < <(
+        jq -r --argjson installed "$installed_json" \
+            '(.enabledPlugins // {}) | to_entries[] | select(.value == true) | .key | . as $id | select(any($installed[]; . == $id) | not)' "$base_file"
+    )
+    [[ ${#missing_plugins[@]} -gt 0 ]] || return 0
+
+    mapfile -t missing_marketplace_entries < <(
+        jq -r --argjson known "$known_marketplaces_json" \
+            '(.extraKnownMarketplaces // {}) | to_entries[] | select(.value.source.source == "github") | .key as $name | select(any($known[]; . == $name) | not) | "\($name) \(.value.source.repo)"' "$base_file"
+    )
+}
+
+run_claude_in_profile() {
+    CLAUDE_CONFIG_DIR="$profile_dir" "$claude_command" "$@"
+}
+
+claude_config_dir_of_process() {
+    local process_dir=$1 configured_dir
+    configured_dir=$(tr '\0' '\n' < "$process_dir/environ" 2> /dev/null | sed -n 's/^CLAUDE_CONFIG_DIR=//p' | head -n 1) || return 1
+    printf '%s\n' "${configured_dir:-$HOME/.claude-personal}"
+}
+
+is_claude_running_in_profile() {
+    local process_dir process_name configured_dir
+    for process_dir in /proc/[0-9]*; do
+        process_name=$(cat "$process_dir/comm" 2> /dev/null) || continue
+        [[ "$process_name" == claude ]] || continue
+        [[ -r "$process_dir/environ" ]] || continue
+        configured_dir=$(claude_config_dir_of_process "$process_dir") || continue
+        [[ "$(readlink -m "$configured_dir")" == "$(readlink -m "$profile_dir")" ]] && return 0
+    done
+    return 1
+}
+
+can_run_plugin_commands() {
+    if ! command -v "$claude_command" > /dev/null 2>&1; then
+        printf 'plugins skipped: %s is not installed\n' "$claude_command"
+        return 1
+    fi
+}
+
+add_missing_marketplaces() {
+    local entry marketplace_name repository
+    for entry in "${missing_marketplace_entries[@]}"; do
+        read -r marketplace_name repository <<< "$entry"
+        if run_claude_in_profile plugin marketplace add "$repository" > /dev/null 2>&1; then
+            printf 'added marketplace %s\n' "$marketplace_name"
+        else
+            printf 'could not add marketplace %s\n' "$marketplace_name"
+            fix_failure_count=$((fix_failure_count + 1))
+        fi
+    done
+}
+
+install_missing_plugins() {
+    local plugin_id
+    [[ ${#missing_plugins[@]} -gt 0 ]] || return 0
+
+    if ! can_run_plugin_commands; then
+        fix_failure_count=$((fix_failure_count + ${#missing_plugins[@]}))
+        return 0
+    fi
+
+    add_missing_marketplaces
+    for plugin_id in "${missing_plugins[@]}"; do
+        if run_claude_in_profile plugin install "$plugin_id" --scope user > /dev/null 2>&1; then
+            printf 'installed plugin %s\n' "$plugin_id"
+        else
+            printf 'could not install plugin %s\n' "$plugin_id"
+            fix_failure_count=$((fix_failure_count + 1))
+        fi
+    done
+}
+
+settings_deviation_count() {
+    printf '%s\n' "${differing_pointers[@]}" "${removed_pointers[@]}" | sort -u | grep -c .
+}
+
+fixable_deviation_count() {
+    printf '%s\n' $(($(settings_deviation_count) + ${#missing_plugins[@]}))
+}
+
+report_deviations() {
+    local pointer plugin_id parts=()
+    local settings_count
+    settings_count=$(settings_deviation_count)
+
+    if [[ "$verbose" == yes ]]; then
+        for pointer in "${differing_pointers[@]}"; do printf 'differs from the base: settings.json %s\n' "$pointer"; done
+        for pointer in "${removed_pointers[@]}"; do printf 'removed from base: settings.json %s\n' "$pointer"; done
+        for plugin_id in "${missing_plugins[@]}"; do printf 'missing plugin: %s\n' "$plugin_id"; done
+    fi
+
+    [[ $settings_count -eq 0 ]] || parts+=("settings deviate from base at $settings_count paths")
+    [[ ${#missing_plugins[@]} -eq 0 ]] || parts+=("missing plugins: ${#missing_plugins[@]}")
+    [[ ${#parts[@]} -gt 0 ]] || return 0
+
+    local summary=${parts[0]} part
+    for part in "${parts[@]:1}"; do
+        summary+=", $part"
+    done
+    printf '%s; run claude-profile-prepare --fix %s\n' "$summary" "$profile"
+}
+
+fix_deviations() {
+    local fixable_count=$1
+    [[ $fixable_count -gt 0 ]] || return 0
+    if is_claude_running_in_profile; then
+        printf 'fix skipped: a claude process of profile %s is running; stop it and rerun claude-profile-prepare --fix %s\n' "$profile" "$profile"
+        fix_failure_count=$((fix_failure_count + fixable_count))
+        return 0
+    fi
+    fix_settings
+    install_missing_plugins
+}
+
+main() {
+    parse_arguments "$@"
+    validate_profile_name
+    [[ -d "$shared_dir" ]] || exit 0
+
+    profile_dir="$profiles_home/.claude-$profile"
+    [[ -d "$profile_dir" ]] || exit 0
+    [[ ! -e "$profile_dir/.no-shared" ]] || exit 0
+
+    command -v jq > /dev/null 2>&1 || fail 'jq is required'
+
+    settings_file="$profile_dir/settings.json"
+    base_file="$shared_dir/settings.base.json"
+    previous_base_file="$shared_dir/.deployed/settings.base.json"
+
+    relink_markers_dir="$shared_dir/.relink-markers"
+    relink_marker="$relink_markers_dir/$profile"
+
+    if is_profile_marked_for_linking; then
+        link_shared_items
+    fi
+    check_settings
+    if [[ "$include_plugins" == yes && -f "$base_file" ]]; then
+        find_missing_plugins
+    fi
+    report_remote_settings
+
+    local fixable_count
+    fixable_count=$(fixable_deviation_count)
+
+    local remaining_count
+    if [[ "$mode" == fix ]]; then
+        fix_deviations "$fixable_count"
+        remaining_count=$((unfixable_problem_count + fix_failure_count))
+    else
+        report_deviations
+        remaining_count=$((unfixable_problem_count + fixable_count))
+    fi
+
+    [[ $remaining_count -eq 0 ]] || exit 1
+}
+
+main "$@"
