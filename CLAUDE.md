@@ -55,6 +55,9 @@ patterns that keep it so:
 | `dotfiles/*` | `~/.config/*` (recursive copy) | `setup_dotfiles.sh` |
 | `configs/kglobalaccel/*` | `~/.local/share/kglobalaccel/` and `~/.local/share/applications/` | `setup_plasma_de.sh` |
 | `configs/bin/*` | `~/.local/bin/` | `setup_plasma_de.sh` |
+| `configs/bin/claude-profile-prepare`, `configs/bin/claude-settings-diff` | `~/.local/bin/` | `setup_claude_profiles.sh install-tooling` |
+| `configs/claude/*` | `~/.claude-shared/` (`settings.json` lands as `settings.base.json`; snapshots in `~/.claude-shared/.deployed/`) | `setup_claude_profiles.sh deploy-files` |
+| `.githooks/pre-commit` | `core.hooksPath` of this clone | `setup_claude_profiles.sh install-tooling` |
 | `configs/konsole/*` | `~/.local/share/konsole/` | `setup_plasma_de.sh` |
 | `configs/kwin/osd-top-right` | `~/.local/share/kwin/scripts/osdtopright/` | `setup_kwin_tiling.sh` |
 | `configs/autostart/*` | `~/.config/autostart/` | `configure_plasma_session.sh` |
@@ -78,6 +81,30 @@ module under `dotfiles/bash/` only reaches terminals.
 at `~/screenshots`, DESKTOP at `$HOME`, and `user-dirs.conf` disables recreation so Music, Videos
 and friends stop reappearing on login. Later stages depend on this — `setup_plasma_de.sh` writes
 Spectacle's save path as `~/screenshots`.
+
+## Claude profiles
+
+The Claude Code profiles live in `~/.claude-<name>`, each with its own login and its own real `settings.json`, around one shared store, `~/.claude-shared`. `~/.claude` and `~/.claude.json` are retired: nothing may write them, and `dotfiles/plasma-workspace/env/20-claude.sh` exports `CLAUDE_CONFIG_DIR=$HOME/.claude-personal` for every graphical launcher.
+
+`scripts/setup_claude_profiles.sh` is sourced with phases, never with defaults: `source scripts/setup_claude_profiles.sh [--dry-run] deploy-files | install-tooling`. `install.sh` runs both, because they touch nothing a running claude owns. `--dry-run` prints every planned action.
+
+`deploy-files` copies `configs/claude/settings.json` to `~/.claude-shared/settings.base.json`, and `hooks/` and `statusline-command.sh` to the shared store, as plain overwrites because nothing writes them. Before it overwrites a base that differs from the repo it keeps the old one as `~/.claude-shared/.deployed/settings.base.json`, which `claude-profile-prepare --fix` uses to remove what the base dropped. `CLAUDE.md` keeps the snapshot logic, because Claude writes it through its link: deployed equals snapshot, then the repo copy overwrites silently; repo equals snapshot, then the deployed copy is kept and reported as drift; both changed, then `diff -u snapshot deployed` and `diff -u snapshot repo` are shown and the stage asks (without a terminal the deployed copy is kept). `claude-settings-diff` (`-d` for diffs) compares the base, hooks and status line plainly and classifies `CLAUDE.md` with the snapshot; fold accepted drift back into the repo by hand.
+
+`configs/claude/settings.json` is the shared BASE, not a profile's settings: it holds only keys meant for every profile and has no `env` object. `install-tooling` installs `claude-profile-prepare` and `claude-settings-diff` to `~/.local/bin` and sets `core.hooksPath` to `.githooks`. The repo is public, so `.githooks/pre-commit` scans every staged file with gitleaks (installed by `setup_hardware_and_cli.sh`) and a token, key, bearer and Authorization regex, and blocks a staged `configs/claude/settings.json` with an `env.CLAUDE_CODE_USE_*`, `AWS_*`, `ANTHROPIC_*` or `CLOUD_ML_REGION` key (through `claude-settings-diff profile-env-keys`; key names only, never values). The hook and status line commands of the base use `"$HOME"/.claude-shared/...`, which the shell that runs them expands.
+
+`claude-profile-prepare [--check | --fix] [--no-plugins] [--verbose] PROFILE` prepares one profile; env overrides are `CLAUDE_SHARED_DIR`, `CLAUDE_PROFILES_HOME` (profile dir `$CLAUDE_PROFILES_HOME/.claude-PROFILE`) and `CLAUDE_COMMAND`. It validates PROFILE against `^[a-z0-9-]+$` and rejects `shared`; exit 0 means no deviations, 1 deviations or unfixed problems, 2 an error. It does nothing, silently, when the shared store does not exist, when the profile directory does not exist (it never creates one), or when the profile directory holds a `.no-shared` file.
+
+Links: only when the marker `~/.claude-shared/.relink-markers/<profile>` exists (written by the migration's `relink.sh` and `share-profile.sh`) does it create the missing links of `projects history.jsonl CLAUDE.md skills agents commands file-history paste-cache` (creating the shared target first), replacing only an empty real entry; a real non-empty entry or a wrong link only prints `not linked: ... run the migration`; it never uses `ln -sfn` and never touches `.credentials.json`, `.claude.json`, `plugins/` or `sessions/`. A profile without the marker gets no links. A profile created later is brought in with `share-profile.sh PROFILE` of the migration folder after its first launch, not by the function.
+
+Settings: an absent `settings.json` is seeded as a mode 600 copy of the base (temp file plus hard link, so two launches cannot both seed); a malformed one is reported and never written. Otherwise the tool walks the base's own leaves: a scalar must be equal at the same JSON Pointer, and every element of an array (objects included) must deep-equal some element of the profile's array, extra elements are fine; extra keys at every level are never touched. `$profile_dir/shared-settings.ignore` lists one JSON Pointer per line, each skipping its whole subtree. Reports show JSON Pointers only, never values. `--fix` writes only the deviating leaves (temp file plus rename, mode 600), appends missing array elements, and removes keys and array elements that the previous base held, the current base dropped, and the profile still holds unchanged (`removed from base`). It refuses to write while a claude process of that profile runs (`/proc/<pid>/environ` `CLAUDE_CONFIG_DIR`, absent meaning `~/.claude-personal`). A `remote-settings.json` in the profile directory is noted: base pointers it also sets print as `overridden by remote-settings`, and `allowManagedHooksOnly` prints a warning.
+
+Plugins (skipped by `--no-plugins`): base `enabledPlugins` entries set to true that are missing from the keys of `plugins/installed_plugins.json` are reported; `--fix` adds the base's missing github `extraKnownMarketplaces` and runs `claude plugin install ID --scope user` with `CLAUDE_CONFIG_DIR` set to the profile directory; a failure prints a message and does not fail a launch.
+
+The `claude` function in `dotfiles/bash/.bash_claude` knows no profile names: it validates the name against `^[a-z0-9-]+$`, calls `claude-profile-prepare --check --no-plugins PROFILE` when it is on PATH (check only: one summary line when settings deviate, no prompt, no plugin install, and its result never blocks the launch), then runs claude in a subshell that sources `profile.env` with `set -a`, so the variables reach that launch only and a broken `profile.env` stops it. `.no-shared` does not stop `profile.env` loading. The `--help` path does not call prepare.
+
+A new profile is just `claude -pf NAME` followed by `/login`, or by Bedrock environment in the profile's own `settings.json` or `profile.env`. Claude Code's Bedrock wizard (`/setup-bedrock`) is fine, because settings are per profile. Run `claude-profile-prepare --fix NAME` with that profile's claude stopped to apply base changes and install plugins.
+
+`tests/test_bash_claude.sh`, `tests/test_claude_profile_prepare.sh`, `tests/test_setup_claude_profiles.sh` and `tests/test_claude_repo_tooling.sh` check the function, the tool and the stage against a fake `claude` and a temporary `HOME`.
 
 ## Plasma configuration model
 
