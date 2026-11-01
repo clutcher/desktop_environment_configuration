@@ -1,0 +1,38 @@
+#!/bin/bash
+
+secret_pattern='(bearer[[:space:]]+[A-Za-z0-9._~+/=-]{16,}|authorization[[:space:]]*[:=]|(api[_-]?key|secret|token|password)[A-Za-z0-9_"'"'"']*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9._~+/=-]{12,}|AKIA[0-9A-Z]{16}|(sk|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{16,}|BEGIN [A-Z ]*PRIVATE KEY)'
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+[[ -z "$staged_files" ]] && exit 0
+
+status=0
+
+if command -v gitleaks > /dev/null 2>&1; then
+    gitleaks protect --staged --redact --no-banner || status=1
+else
+    printf 'Warning: gitleaks is not installed; only the regex secret scan ran\n' >&2
+fi
+
+while IFS= read -r file; do
+    matches=$(git show ":$file" | grep -nEi "$secret_pattern")
+    if [[ -n "$matches" ]]; then
+        printf 'Possible secret in %s:\n%s\n' "$file" "$matches" >&2
+        status=1
+    fi
+done <<< "$staged_files"
+
+if grep -qx 'configs/claude/settings.json' <<< "$staged_files"; then
+    settings_tool="$(git rev-parse --show-toplevel)/configs/bin/claude-settings-diff"
+    if [[ ! -x "$settings_tool" ]]; then
+        printf 'Cannot check base settings: %s is missing\n' "$settings_tool" >&2
+        status=1
+    else
+        while IFS= read -r key; do
+            printf 'Staged configs/claude/settings.json sets env.%s: it is the base of every profile; put it into the profile'"'"'s own settings.json or profile.env\n' "$key" >&2
+            status=1
+        done < <("$settings_tool" profile-env-keys <(git show ":configs/claude/settings.json"))
+    fi
+fi
+
+[[ $status -eq 0 ]] || printf 'Commit blocked by the staged secret scan\n' >&2
+exit "$status"

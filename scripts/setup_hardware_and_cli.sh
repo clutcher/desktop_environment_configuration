@@ -3,7 +3,7 @@
 # Install cli packages for comfort work
 sudo apt install -y mc jq zip curl wget \
     git git-lfs imagemagick openvpn \
-    net-tools openssh-client xdg-user-dirs \
+    net-tools openssh-client xdg-user-dirs gitleaks \
     fonts-noto-core fonts-noto-color-emoji
 
 sudo fc-cache -fv
