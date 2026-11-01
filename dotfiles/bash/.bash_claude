@@ -1,5 +1,22 @@
 #!/bin/bash
 
+__claude_run_in_profile() {
+    local profile_dir=$1
+    shift
+
+    (
+        set -a
+        [[ -f "$profile_dir/profile.env" ]] && { . "$profile_dir/profile.env" || exit 1; }
+        set +a
+        CLAUDE_CONFIG_DIR="$profile_dir" exec claude "$@"
+    )
+}
+
+__claude_prepare_profile() {
+    command -v claude-profile-prepare > /dev/null 2>&1 || return 0
+    claude-profile-prepare --check --no-plugins "$1" || true
+}
+
 claude() {
     local profile_value="personal"
     local claude_args=()
@@ -10,31 +27,35 @@ claude() {
     local color_reset='\033[0m'
 
     show_help() {
-        cat <<'EOF'
+        cat <<'EOF_HELP'
 Usage: claude [-pf PROFILE] [--] [claude arguments...]
 
 Options:
-  -pf, --profile PROFILE  Select profile name. Sets CLAUDE_CONFIG_DIR to
-                          "$HOME/.claude-PROFILE" for the launched claude command.
+  -pf, --profile PROFILE  Select profile name ([a-z0-9-]+). Sets CLAUDE_CONFIG_DIR to
+                          "$HOME/.claude-PROFILE" for the launched claude command and
+                          loads "$HOME/.claude-PROFILE/profile.env" for that launch only.
   -h, --help              Show this help message and original claude help.
-EOF
+EOF_HELP
     }
 
     while [[ $# -gt 0 ]]; do
         case $1 in
             -pf|--profile)
-                if [[ -n "$2" && "$2" != -* ]]; then
-                    profile_value="$2"
-                    shift 2
-                else
+                if [[ -z "$2" || "$2" == -* ]]; then
                     printf 'Error: %s requires a value\n' "$1" >&2
                     return 1
                 fi
+                if [[ ! "$2" =~ ^[a-z0-9-]+$ ]]; then
+                    printf 'Error: invalid profile name "%s" (allowed: a-z, 0-9, -)\n' "$2" >&2
+                    return 1
+                fi
+                profile_value="$2"
+                shift 2
                 ;;
             -h|--help)
                 show_help
                 printf '\nOriginal claude help:\n\n'
-                CLAUDE_CONFIG_DIR="$HOME/.claude-$profile_value" command claude --help
+                __claude_run_in_profile "$HOME/.claude-$profile_value" --help
                 return $?
                 ;;
             --)
@@ -49,6 +70,8 @@ EOF
         esac
     done
 
+    __claude_prepare_profile "$profile_value"
+
     printf '\n'
     printf "${color_border}╔══════════════════════════════════════╗${color_reset}\n"
     printf "${color_border}║${color_label}          CLAUDE PROFILE              ${color_border}║${color_reset}\n"
@@ -56,5 +79,5 @@ EOF
     printf "${color_border}╚══════════════════════════════════════╝${color_reset}\n"
     printf '\n'
 
-    CLAUDE_CONFIG_DIR="$HOME/.claude-$profile_value" command claude "${claude_args[@]}"
+    __claude_run_in_profile "$HOME/.claude-$profile_value" "${claude_args[@]}"
 }
